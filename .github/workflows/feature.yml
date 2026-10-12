@@ -38,6 +38,9 @@ jobs:
       - name: Test
         run: go test -race ./...
 
+      - name: Known vulnerabilities (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14.0
@@ -60,21 +63,3 @@ jobs:
         with:
           version: "~> v2"
           args: release --snapshot --clean --skip=publish
-
-  container-vulnerability-scan:
-    name: Container vulnerabilities / Trivy
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Build image
-        run: docker build --tag minitest-connector:pr .
-
-      - name: Scan image
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: minitest-connector:pr
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: "1"

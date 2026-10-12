@@ -55,17 +55,6 @@ The script verifies the download against the release checksums and installs to
 `/usr/local/bin` (or `~/.local/bin` when that is not writable). It works on macOS too.
 Pin a version with `MINITEST_CONNECTOR_VERSION=v0.1.0`.
 
-### Docker
-
-```sh
-docker run -d --restart unless-stopped --name minitest-connector \
-  -e MINITEST_CONNECTOR_TOKEN=<token> \
-  -e MINITEST_CONNECTOR_ALLOW='*.staging.example.com' \
-  ghcr.io/minitap-ai/minitest-connector:latest
-```
-
-Images are multi-arch (`linux/amd64`, `linux/arm64`) and tagged by version (`0.1.0`, `0.1`, `latest`).
-
 With `sudo`, `service install` registers a service that starts at boot (launchd daemon
 on macOS, systemd unit running as an unprivileged dynamic user on Linux). Without
 `sudo`, it installs a per-user service. The token is stored in a `0600` config file,
@@ -100,7 +89,7 @@ a domain must be allowed both there and on the connector to be reachable.
 | | `HTTPS_PROXY` | corporate proxy for the outbound connection |
 
 Logs go to `/Library/Logs/minitest-connector.log` (macOS service),
-`journalctl -u minitest-connector` (Linux service), or stdout (`run`, Docker). They
+`journalctl -u minitest-connector` (Linux service), or stdout (`run`). They
 contain hostnames and byte counts, never tokens or payloads.
 
 ## Network requirements
