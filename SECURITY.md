@@ -37,8 +37,10 @@ cannot change them remotely.
 - **Allowed ports** (`--ports`, default `443`).
 - **Blocked addresses**: loopback, link-local, multicast, unspecified and cloud metadata
   addresses (`169.254.169.254`, `fd00:ec2::254`, `100.100.100.200`) are always refused,
-  even when an allowed hostname resolves to them. This blocks DNS rebinding toward the
-  connector machine itself or its cloud credentials.
+  even when an allowed hostname resolves to them, so a DNS answer cannot point the
+  connector at its own machine or at cloud credentials. Private ranges (`10.0.0.0/8`,
+  `172.16.0.0/12`, `192.168.0.0/16`) stay reachable, since that is where internal hosts
+  live: only list hostnames whose DNS you control.
 - **DNS**: names are resolved by the connector with your network's resolvers.
 - **On/off**: stopping the service or revoking the token cuts access immediately.
 

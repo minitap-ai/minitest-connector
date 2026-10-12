@@ -161,7 +161,7 @@ func Install(l Layout, cfg Config) error {
 	return start(l)
 }
 
-// Restart stops and starts an installed service, so it picks up a new binary.
+// Restart restarts an installed service so it runs the binary currently on disk.
 func Restart(l Layout) error {
 	if _, err := os.Stat(l.UnitPath); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -169,8 +169,13 @@ func Restart(l Layout) error {
 		}
 		return err
 	}
-	_ = stop(l)
-	return start(l)
+	if l.OS != "darwin" {
+		return run("systemctl", append(userFlag(l), "restart", unitName)...)
+	}
+	if exec.Command("launchctl", "print", launchdTarget(l)).Run() != nil {
+		return start(l) // installed but not loaded
+	}
+	return run("launchctl", "kickstart", "-k", launchdTarget(l))
 }
 
 // Uninstall stops the service and removes its files.
