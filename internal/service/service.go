@@ -161,6 +161,18 @@ func Install(l Layout, cfg Config) error {
 	return start(l)
 }
 
+// Restart stops and starts an installed service, so it picks up a new binary.
+func Restart(l Layout) error {
+	if _, err := os.Stat(l.UnitPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("no service installed at %s: run service install first", l.UnitPath)
+		}
+		return err
+	}
+	_ = stop(l)
+	return start(l)
+}
+
 // Uninstall stops the service and removes its files.
 func Uninstall(l Layout) error {
 	_ = stop(l)

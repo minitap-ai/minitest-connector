@@ -97,9 +97,41 @@ contain hostnames and byte counts, never tokens or payloads.
 The machine needs outbound HTTPS to `connect.minitap.ai` on port 443, and network
 access to the internal hosts you allow.
 
+Test devices trust the usual public certificate authorities. If your staging uses
+certificates from an internal CA, your test build must trust that CA.
+
+## Check that it works
+
+1. `minitest-connector service status` shows the service running, and the log shows
+   `connector.session_established` twice.
+2. In the Minitest web app, the connector shows **Online** with your machine's name.
+3. In your app's settings (**General → Private network**), turn it on, pick the
+   connector and list the internal domains the app calls. Domains the connector does
+   not allow are flagged there.
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Log shows `connector.unauthorized` | The token is wrong, rotated or revoked. Copy a new one from the web app and run `service install` again. |
+| Log shows `connector.connect_failed` | The machine cannot reach `connect.minitap.ai:443`. Check the firewall or set `HTTPS_PROXY`. |
+| Online, but a host does not load in tests | Check the host is in `--allow` on the connector **and** in the app's internal domains, and that its port is in `--ports`. Refused requests appear in the log as `connector.stream_denied` with a reason. |
+| `connector.stream_denied` with reason `dial_failed` | The connector machine itself cannot reach the host. Try `curl` from that machine. |
+
+## Updating
+
+```sh
+brew upgrade minitest-connector && sudo minitest-connector service restart
+```
+
+On Linux, run the install script again, then `sudo minitest-connector service restart`.
+A restart takes a second or two, but cuts connections in flight: prefer doing it between test runs.
+
 ## Security
 
-Found a vulnerability? Please email support@minitap.ai rather than opening a public issue.
+See [SECURITY.md](SECURITY.md) for the security overview to share with your security
+team. Found a vulnerability? Please email support@minitap.ai rather than opening a public
+issue.
 
 ## Development
 
