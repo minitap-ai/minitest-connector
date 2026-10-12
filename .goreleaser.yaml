@@ -1,0 +1,65 @@
+version: 2
+
+project_name: minitest-connector
+
+builds:
+  - id: minitest-connector
+    main: ./cmd/connector
+    binary: minitest-connector
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/minitap-ai/minitest-connector/internal/version.Version={{ .Tag }}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+homebrew_casks:
+  - name: minitest-connector
+    repository:
+      owner: minitap-ai
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Casks
+    homepage: https://github.com/minitap-ai/minitest-connector
+    description: Lets Minitest test devices reach apps inside your private network
+    license: Apache-2.0
+    binaries: [minitest-connector]
+    commit_author:
+      name: github-actions[bot]
+      email: github-actions[bot]@users.noreply.github.com
+    commit_msg_template: "chore: update minitest-connector to {{ .Tag }}"
+    skip_upload: auto
+    hooks:
+      post:
+        # The binary is not notarized yet; Homebrew casks quarantine downloads.
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/minitest-connector"]
+          end
+
+release:
+  github:
+    owner: minitap-ai
+    name: minitest-connector
+  prerelease: auto
+
+changelog:
+  use: github
+  filters:
+    exclude:
+      - "^chore"
+      - "^ci"
+      - "^docs"
