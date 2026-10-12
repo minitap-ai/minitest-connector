@@ -47,9 +47,13 @@ minitest-connector service status
 ### Linux
 
 ```sh
-curl -fsSL https://get.minitap.ai/connector | sh
+curl -fsSL https://raw.githubusercontent.com/minitap-ai/minitest-connector/main/install.sh | sh
 sudo minitest-connector service install --token <token> --allow '*.staging.example.com'
 ```
+
+The script verifies the download against the release checksums and installs to
+`/usr/local/bin` (or `~/.local/bin` when that is not writable). It works on macOS too.
+Pin a version with `MINITEST_CONNECTOR_VERSION=v0.1.0`.
 
 ### Docker
 
@@ -59,6 +63,8 @@ docker run -d --restart unless-stopped --name minitest-connector \
   -e MINITEST_CONNECTOR_ALLOW='*.staging.example.com' \
   ghcr.io/minitap-ai/minitest-connector:latest
 ```
+
+Images are multi-arch (`linux/amd64`, `linux/arm64`) and tagged by version (`0.1.0`, `0.1`, `latest`).
 
 With `sudo`, `service install` registers a service that starts at boot (launchd daemon
 on macOS, systemd unit running as an unprivileged dynamic user on Linux). Without
