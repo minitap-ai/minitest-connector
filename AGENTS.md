@@ -1,6 +1,6 @@
 # minitest-connector — agent notes
 
-Outbound-only tunnel letting Minitest devices reach a customer's private network.
+Outbound-only tunnel letting Minitest test devices reach apps inside a customer's private network. This repo is public: no secrets, customer names or internal hostnames in code, tests, commits or PRs.
 Two binaries share this module: the connector (customer side) and the relay (GKE).
 See README.md for the traffic path.
 

@@ -52,23 +52,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - id: scan-changes
-        uses: minitap-ai/devops-common/.github/actions/container-scan-changes@v8
-        with:
-          additional-paths: |
-            .github/workflows/feature.yml
-            **/*.go
-            go.mod
-            go.sum
-
       - name: Build image
-        if: steps.scan-changes.outputs.should-scan == 'true'
         run: docker build --build-arg TARGET=${{ matrix.target }} --tag minitest-connector-${{ matrix.target }}:pr .
 
       - name: Scan image
-        if: steps.scan-changes.outputs.should-scan == 'true'
-        uses: minitap-ai/devops-common/.github/actions/trivy-container-vulnerability-scan@v8
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: minitest-connector-${{ matrix.target }}:pr
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
           exit-code: "1"
-          artifact-name: trivy-${{ matrix.target }}
