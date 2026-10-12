@@ -21,13 +21,17 @@ import (
 
 	"github.com/minitap-ai/minitest-connector/internal/connector"
 	"github.com/minitap-ai/minitest-connector/internal/selector"
+	"github.com/minitap-ai/minitest-connector/internal/service"
 	"github.com/minitap-ai/minitest-connector/internal/version"
 )
 
 const usage = `minitest-connector lets Minitest devices reach your private network.
 
 Usage:
-  minitest-connector run [flags]
+  minitest-connector run [flags]                  run in the foreground
+  minitest-connector service install [flags]      install and start as an always-on service
+  minitest-connector service uninstall
+  minitest-connector service status
   minitest-connector version
 
 Flags for run:
@@ -53,8 +57,12 @@ func main() {
 	switch os.Args[1] {
 	case "version", "-version", "--version":
 		fmt.Println(version.Version)
-	case "run":
-		if err := run(os.Args[2:]); err != nil {
+	case "run", "service":
+		cmd := run
+		if os.Args[1] == "service" {
+			cmd = serviceCmd
+		}
+		if err := cmd(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, "minitest-connector:", err)
 			os.Exit(1)
 		}
@@ -134,6 +142,65 @@ func run(args []string) error {
 	defer stop()
 	if err := c.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		return err
+	}
+	return nil
+}
+
+func serviceCmd(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: minitest-connector service install|uninstall|status")
+	}
+	layout, err := service.Detect()
+	if err != nil {
+		return err
+	}
+	switch args[0] {
+	case "uninstall":
+		if err := service.Uninstall(layout); err != nil {
+			return err
+		}
+		fmt.Println("minitest-connector service removed")
+		return nil
+	case "status":
+		return service.Status(layout)
+	case "install":
+	default:
+		return fmt.Errorf("unknown service command %q", args[0])
+	}
+
+	fs := flag.NewFlagSet("service install", flag.ExitOnError)
+	var allow stringList
+	token := fs.String("token", "", "connector token (or MINITEST_CONNECTOR_TOKEN)")
+	relayURL := fs.String("relay", "", "relay URL (default "+connector.DefaultRelayURL+")")
+	ports := fs.String("ports", "", "comma-separated destination ports to allow (default 443)")
+	fs.Var(&allow, "allow", "domain allowed through the tunnel (repeatable, comma-separated)")
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
+	}
+	tok := firstNonEmpty(*token, os.Getenv("MINITEST_CONNECTOR_TOKEN"))
+	if tok == "" {
+		return errors.New("no token: pass --token or set MINITEST_CONNECTOR_TOKEN")
+	}
+	sel, err := selector.Parse(allow)
+	if err != nil {
+		return fmt.Errorf("allow: %w", err)
+	}
+	var portList []int
+	if *ports != "" {
+		if portList, err = parsePorts(*ports); err != nil {
+			return err
+		}
+	}
+	if err := service.Install(layout, service.Config{Token: tok, Relay: *relayURL, Allow: sel, Ports: portList}); err != nil {
+		return err
+	}
+	scope := "user service (runs while you are logged in; use sudo for a boot-time service)"
+	if layout.System {
+		scope = "system service (starts at boot)"
+	}
+	fmt.Printf("minitest-connector installed as a %s\n  config: %s\n  service: %s\n", scope, layout.ConfigPath, layout.UnitPath)
+	if layout.LogPath != "" {
+		fmt.Printf("  logs:   %s\n", layout.LogPath)
 	}
 	return nil
 }

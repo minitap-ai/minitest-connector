@@ -54,6 +54,18 @@ curl -p --proxy http://localhost:18081 \
 The connector refuses loopback and link-local targets, so test against a real
 hostname.
 
+### Install as a service (customer machine)
+
+```sh
+brew install minitap-ai/tap/minitest-connector
+sudo minitest-connector service install --token <token> --allow '*.stg.example.local'
+minitest-connector service status
+```
+
+With `sudo` it is a boot-time service (launchd daemon / systemd system unit,
+unprivileged `DynamicUser` on Linux); without, a per-user service. The token is
+stored in a `0600` config file, never in the service definition.
+
 ### Configuration
 
 Connector (`minitest-connector run`): `MINITEST_CONNECTOR_TOKEN` (required),

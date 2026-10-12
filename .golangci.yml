@@ -11,3 +11,9 @@ linters:
         - (net/http.ResponseWriter).Write
         - (*encoding/json.Encoder).Encode
         - io.WriteString
+  exclusions:
+    rules:
+      # Only launchctl/systemctl with arguments built from our own layout.
+      - path: internal/service/
+        linters: [gosec]
+        text: G204
