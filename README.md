@@ -1,92 +1,111 @@
-# minitest-connector
+# Minitest Connector
 
-Lets Minitest test devices reach apps and APIs that live inside a customer's private
-network (e.g. a staging environment behind a firewall), without opening any inbound port.
+Lets Minitest test devices reach apps and APIs that live inside your private network
+(e.g. a staging environment behind a firewall), without opening any inbound port.
 
-Same model as LambdaTest Tunnel or BrowserStack Local: the customer runs a small agent
-inside their network, it dials out to Minitap, and only the domains they allow go through.
+You run the connector on a machine inside your network. It opens an outbound-only,
+encrypted connection to Minitest, and only the domains you allow go through it.
 
-## Components
-
-| Path | Runs where | What it does |
-|------|-----------|--------------|
-| `cmd/connector` | Customer network (macOS, Linux, Docker) | Opens an outbound-only WSS connection on port 443 to the relay and forwards streams to internal hosts. Only domains matching its local `--allow` list are dialed; DNS resolves inside the customer network. |
-| `cmd/relay` | Minitap GKE | Authenticates connectors (tokens issued by testing-service), keeps one session per connector, and bridges device egress traffic (HTTP CONNECT from the testing-service worker's `limrtc egress`) to the right tenant's connector. |
-
-## Traffic path
+## How it works
 
 ```
-Limrun device ──Limrun tunnel (domain selectors)──> testing-service worker (limrtc egress)
-  ──HTTP CONNECT + run token──> relay (GKE)
-  <══ WSS 443 (outbound from customer) ══ connector ──> private network
+Minitest test device ──> Minitest ══ outbound WSS, port 443 ══ connector (your network) ──> your staging
 ```
 
-- The customer controls what is reachable (`--allow` on the connector). Minitap enforces
-  the app's configured domains a second time on the relay.
-- Tokens are shown once, stored hashed by testing-service, revocable from the web app.
-- Runs fail closed: if the app's connector is offline, the run is blocked before a device
-  is leased.
+- **Outbound only.** The connector dials out over WSS on port 443, like a browser.
+  No inbound firewall rule, no VPN. Corporate HTTP proxies are supported (`HTTPS_PROXY`).
+- **You decide what is reachable.** The connector only dials hosts that match its
+  `--allow` list, on the ports you choose (443 by default). Everything else is refused
+  on your machine, before any connection is made.
+- **DNS stays inside your network.** Hostnames are resolved by the connector, so
+  internal domains work as they do for your team.
+- **Defense in depth.** Minitest also restricts each app to the internal domains
+  configured for it, and the connector refuses loopback, link-local and cloud metadata
+  addresses even when an allowed domain resolves to them.
+- **Revocable.** Each connector has its own token, shown once in the Minitest web app
+  and revocable at any time. Connections and denied requests are audit-logged.
+- **Highly available.** Each connector keeps two connections to Minitest and reconnects
+  on its own. For redundancy, run it on two machines with the same token and the same
+  `--allow` list.
 
-## Development
+## Install
 
-Requires Go (see `go.mod`).
+Create a connector in the Minitest web app (**Workspace settings → Private network →
+Add connector**) to get your token, then install it on a machine that can reach your
+staging.
 
-```sh
-go build ./...
-go vet ./...
-goimports -l .        # must print nothing
-go test -race ./...
-golangci-lint run
-```
-
-### Run it locally
-
-```sh
-env_file=$(mktemp)   # private file: it holds dev tokens
-go run ./internal/tools/devtoken -domains example.com > "$env_file"
-set -a; . "$env_file"; set +a
-RELAY_PUBLIC_PORT=18080 RELAY_INTERNAL_PORT=18081 go run ./cmd/relay &
-go run ./cmd/connector run --relay ws://localhost:18080/v1/connect --allow example.com &
-curl -p --proxy http://localhost:18081 \
-  --proxy-header "Proxy-Authorization: Bearer $RUN_TOKEN" https://example.com/
-```
-
-The connector refuses loopback and link-local targets, so test against a real
-hostname.
-
-### Install as a service (customer machine)
+### macOS (Homebrew)
 
 ```sh
 brew install minitap-ai/tap/minitest-connector
-sudo minitest-connector service install --token <token> --allow '*.stg.example.local'
+sudo minitest-connector service install \
+  --token <token> \
+  --allow '*.staging.example.com,api-staging.example.com'
 minitest-connector service status
 ```
 
-With `sudo` it is a boot-time service (launchd daemon / systemd system unit,
-unprivileged `DynamicUser` on Linux); without, a per-user service. The token is
-stored in a `0600` config file, never in the service definition.
+### Linux
 
-### Configuration
+```sh
+curl -fsSL https://get.minitap.ai/connector | sh
+sudo minitest-connector service install --token <token> --allow '*.staging.example.com'
+```
 
-Connector (`minitest-connector run`): `MINITEST_CONNECTOR_TOKEN` (required),
-`--allow` / `MINITEST_CONNECTOR_ALLOW`, `--ports` / `MINITEST_CONNECTOR_PORTS`
-(default `443`), `--relay` / `MINITEST_CONNECTOR_RELAY`, `--config <yaml>`,
-`HTTPS_PROXY` for corporate proxies.
+### Docker
 
-Relay: `RELAY_RUN_TOKEN_KEYS` (`kid:base64-ed25519-pub,...`), `RELAY_STATIC_CONNECTORS`
-(dev only), `RELAY_PUBLIC_PORT` (8080), `RELAY_INTERNAL_PORT` (8081),
-`RELAY_PEERS_SERVICE` (headless service for peer lookup), `POD_NAME`, `POD_IP`,
-`RELAY_TRUST_PROXY_HEADERS`, `RELAY_DRAIN_TIMEOUT_SECONDS` (1200), `LOG_LEVEL`.
+```sh
+docker run -d --restart unless-stopped --name minitest-connector \
+  -e MINITEST_CONNECTOR_TOKEN=<token> \
+  -e MINITEST_CONNECTOR_ALLOW='*.staging.example.com' \
+  ghcr.io/minitap-ai/minitest-connector:latest
+```
 
-## Release
+With `sudo`, `service install` registers a service that starts at boot (launchd daemon
+on macOS, systemd unit running as an unprivileged dynamic user on Linux). Without
+`sudo`, it installs a per-user service. The token is stored in a `0600` config file,
+never in the service definition. Remove it with `minitest-connector service uninstall`.
 
-Connector binaries (darwin arm64/amd64, signed and notarized; linux amd64/arm64), the
-Docker image, and the Homebrew formula in `minitap-ai/homebrew-tap` are published from
-`v*` tags. The relay image deploys through `k8s-apps` like other Minitap services.
+To run it in the foreground instead (e.g. to try it out):
 
-## Related repos
+```sh
+MINITEST_CONNECTOR_TOKEN=<token> minitest-connector run --allow '*.staging.example.com'
+```
 
-- `mobile-use-cli` (`capture/internal/egress`): Limrun destination tunnel and domain
-  selectors, shared with the residential proxy.
-- `testing-service`: connector registry, per-app private network config, run gating.
-- `webapp-minitest`: Workspace settings → Private network, app settings, run launcher.
+## Allowed domains
+
+`--allow` takes a comma-separated list:
+
+| Entry | Matches |
+|-------|---------|
+| `api-staging.example.com` | exactly that host |
+| `*.staging.example.com` | any subdomain of `staging.example.com` (not the domain itself) |
+
+Up to 64 entries. In the Minitest web app, each app lists the internal domains it needs;
+a domain must be allowed both there and on the connector to be reachable.
+
+## Configuration
+
+| Flag | Environment variable | Default |
+|------|----------------------|---------|
+| (token) | `MINITEST_CONNECTOR_TOKEN` | required |
+| `--allow` | `MINITEST_CONNECTOR_ALLOW` | required |
+| `--ports` | `MINITEST_CONNECTOR_PORTS` | `443` |
+| `--config <file>` | | YAML with `token`, `allow`, `ports` |
+| | `HTTPS_PROXY` | corporate proxy for the outbound connection |
+
+Logs go to `/Library/Logs/minitest-connector.log` (macOS service),
+`journalctl -u minitest-connector` (Linux service), or stdout (`run`, Docker). They
+contain hostnames and byte counts, never tokens or payloads.
+
+## Network requirements
+
+The machine needs outbound HTTPS to `connect.minitap.ai` on port 443, and network
+access to the internal hosts you allow.
+
+## Security
+
+Found a vulnerability? Please email security@minitap.ai rather than opening an issue.
+
+## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
