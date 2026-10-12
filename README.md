@@ -39,6 +39,32 @@ go test -race ./...
 golangci-lint run
 ```
 
+### Run it locally
+
+```sh
+go run ./internal/tools/devtoken -domains example.com > /tmp/pn.env   # dev keys + tokens
+set -a; . /tmp/pn.env; set +a
+RELAY_PUBLIC_PORT=18080 RELAY_INTERNAL_PORT=18081 go run ./cmd/relay &
+go run ./cmd/connector run --relay ws://localhost:18080/v1/connect --allow example.com &
+curl -p --proxy http://localhost:18081 \
+  --proxy-header "Proxy-Authorization: Bearer $RUN_TOKEN" https://example.com/
+```
+
+The connector refuses loopback and link-local targets, so test against a real
+hostname.
+
+### Configuration
+
+Connector (`minitest-connector run`): `MINITEST_CONNECTOR_TOKEN` (required),
+`--allow` / `MINITEST_CONNECTOR_ALLOW`, `--ports` / `MINITEST_CONNECTOR_PORTS`
+(default `443`), `--relay` / `MINITEST_CONNECTOR_RELAY`, `--config <yaml>`,
+`HTTPS_PROXY` for corporate proxies.
+
+Relay: `RELAY_RUN_TOKEN_KEYS` (`kid:base64-ed25519-pub,...`), `RELAY_STATIC_CONNECTORS`
+(dev only), `RELAY_PUBLIC_PORT` (8080), `RELAY_INTERNAL_PORT` (8081),
+`RELAY_PEERS_SERVICE` (headless service for peer lookup), `POD_NAME`, `POD_IP`,
+`RELAY_TRUST_PROXY_HEADERS`, `RELAY_DRAIN_TIMEOUT_SECONDS` (1200), `LOG_LEVEL`.
+
 ## Release
 
 Connector binaries (darwin arm64/amd64, signed and notarized; linux amd64/arm64), the
