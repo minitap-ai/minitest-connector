@@ -1,0 +1,22 @@
+# Build output
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+coverage.*
+
+# Env and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local connector config written by `connector service install` during dev
+config.local.yaml
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store

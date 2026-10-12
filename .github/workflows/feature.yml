@@ -1,0 +1,43 @@
+name: Feature Integration 🧩
+
+on:
+  workflow_call:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  build-lint-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - run: go install golang.org/x/tools/cmd/goimports@latest
+
+      - name: Check formatting
+        run: test -z "$(goimports -l .)"
+
+      - name: Check go.mod is tidy
+        run: go mod tidy && git diff --exit-code go.mod
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
+
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
