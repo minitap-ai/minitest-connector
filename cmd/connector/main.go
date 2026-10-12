@@ -30,6 +30,7 @@ const usage = `minitest-connector lets Minitest devices reach your private netwo
 Usage:
   minitest-connector run [flags]                  run in the foreground
   minitest-connector service install [flags]      install and start as an always-on service
+  minitest-connector service restart              restart the service (e.g. after an upgrade)
   minitest-connector service uninstall
   minitest-connector service status
   minitest-connector version
@@ -148,7 +149,7 @@ func run(args []string) error {
 
 func serviceCmd(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: minitest-connector service install|uninstall|status")
+		return errors.New("usage: minitest-connector service install|restart|uninstall|status")
 	}
 	layout, err := service.Detect()
 	if err != nil {
@@ -163,6 +164,12 @@ func serviceCmd(args []string) error {
 		return nil
 	case "status":
 		return service.Status(layout)
+	case "restart":
+		if err := service.Restart(layout); err != nil {
+			return err
+		}
+		fmt.Println("minitest-connector service restarted")
+		return nil
 	case "install":
 	default:
 		return fmt.Errorf("unknown service command %q", args[0])
