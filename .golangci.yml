@@ -1,0 +1,13 @@
+version: "2"
+
+linters:
+  enable:
+    - gosec
+  settings:
+    errcheck:
+      exclude-functions:
+        - (io.ReadCloser).Close
+        - (net.Conn).Close
+        - (net/http.ResponseWriter).Write
+        - (*encoding/json.Encoder).Encode
+        - io.WriteString
