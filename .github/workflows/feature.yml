@@ -46,19 +46,16 @@ jobs:
     name: Container vulnerabilities / Trivy
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [relay, connector]
     steps:
       - uses: actions/checkout@v7
 
       - name: Build image
-        run: docker build --build-arg TARGET=${{ matrix.target }} --tag minitest-connector-${{ matrix.target }}:pr .
+        run: docker build --tag minitest-connector:pr .
 
       - name: Scan image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: minitest-connector-${{ matrix.target }}:pr
+          image-ref: minitest-connector:pr
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"

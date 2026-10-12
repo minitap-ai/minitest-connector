@@ -12,9 +12,9 @@ import (
 
 	"github.com/hashicorp/yamux"
 
-	"github.com/minitap-ai/minitest-connector/internal/netguard"
-	"github.com/minitap-ai/minitest-connector/internal/pipe"
-	"github.com/minitap-ai/minitest-connector/internal/wire"
+	"github.com/minitap-ai/minitest-connector/pkg/netguard"
+	"github.com/minitap-ai/minitest-connector/pkg/pipe"
+	"github.com/minitap-ai/minitest-connector/pkg/wire"
 )
 
 const (

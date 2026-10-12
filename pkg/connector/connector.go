@@ -17,8 +17,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/minitap-ai/minitest-connector/internal/netguard"
-	"github.com/minitap-ai/minitest-connector/internal/selector"
+	"github.com/minitap-ai/minitest-connector/pkg/netguard"
+	"github.com/minitap-ai/minitest-connector/pkg/selector"
 )
 
 // DefaultRelayURL is the production relay.
