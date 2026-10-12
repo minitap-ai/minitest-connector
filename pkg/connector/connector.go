@@ -122,6 +122,10 @@ func (c *Connector) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
+// maxSameRelayRetries keeps the odds of ending up on a single relay pod
+// below 1 in 250 with two pods.
+const maxSameRelayRetries = 8
+
 func (c *Connector) slotLoop(ctx context.Context, slot int) {
 	backoff := time.Second
 	sameRelayRetries := 0
@@ -143,9 +147,10 @@ func (c *Connector) slotLoop(ctx context.Context, slot int) {
 		}
 		backoff = time.Second
 
-		if c.sharesRelay(slot, s.relayID) && sameRelayRetries < 3 {
+		if c.sharesRelay(slot, s.relayID) && sameRelayRetries < maxSameRelayRetries {
 			// Both sessions on one relay pod would make that pod a single point
-			// of failure: try to land elsewhere.
+			// of failure: try to land elsewhere. The load balancer picks a pod
+			// per connection, so with two pods each retry has even odds.
 			sameRelayRetries++
 			s.close()
 			sleep(ctx, jitter(500*time.Millisecond))
