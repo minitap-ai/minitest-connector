@@ -104,8 +104,12 @@ access to the internal hosts you allow.
 
 ## Security
 
-Found a vulnerability? Please email security@minitap.ai rather than opening an issue.
+Found a vulnerability? Please email support@minitap.ai rather than opening a public issue.
 
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[Apache License 2.0](LICENSE)

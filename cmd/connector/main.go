@@ -19,10 +19,10 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/minitap-ai/minitest-connector/internal/connector"
-	"github.com/minitap-ai/minitest-connector/internal/selector"
 	"github.com/minitap-ai/minitest-connector/internal/service"
 	"github.com/minitap-ai/minitest-connector/internal/version"
+	"github.com/minitap-ai/minitest-connector/pkg/connector"
+	"github.com/minitap-ai/minitest-connector/pkg/selector"
 )
 
 const usage = `minitest-connector lets Minitest devices reach your private network.

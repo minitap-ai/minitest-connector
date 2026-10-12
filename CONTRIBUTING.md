@@ -1,16 +1,19 @@
 # Contributing
 
-This module builds two binaries:
+## Layout
 
-| Path | Runs where | What it does |
-|------|-----------|--------------|
-| `cmd/connector` | Your network (macOS, Linux, Docker) | Outbound WSS connection to the relay; dials allowed internal hosts. |
-| `cmd/relay` | Minitest infrastructure | Authenticates connectors and bridges device traffic (HTTP CONNECT with a short-lived, per-run token) to the right connector. |
+| Path | What it is |
+|------|-----------|
+| `cmd/connector` | The `minitest-connector` binary: `run`, `service install/uninstall/status`, `version`. |
+| `pkg/connector` | The agent: outbound sessions to Minitest, allowlist and port checks, dialing. |
+| `pkg/wire` | The connector ↔ Minitest protocol (WebSocket, yamux streams, small JSON frames). |
+| `pkg/selector` | Allowed-domain syntax (`host`, `*.domain`). |
+| `pkg/netguard` | Refuses loopback, link-local and cloud metadata addresses at dial time. |
+| `pkg/pipe` | Bidirectional copy with half-close. |
+| `internal/service` | launchd and systemd service install. |
 
-```
-test device ──> Minitest egress ──HTTP CONNECT + run token──> relay
-  <══ WSS 443 (outbound) ══ connector ──> private network
-```
+`pkg/` is imported by the Minitest relay, so changes there must stay backward compatible
+with connectors already deployed (bump `wire.ProtocolVersion` for breaking changes).
 
 ## Development
 
@@ -24,26 +27,7 @@ go test -race ./...
 golangci-lint run
 ```
 
-### Run it locally
-
-```sh
-env_file=$(mktemp)   # private file: it holds dev tokens
-go run ./internal/tools/devtoken -domains example.com > "$env_file"
-set -a; . "$env_file"; set +a
-RELAY_PUBLIC_PORT=18080 RELAY_INTERNAL_PORT=18081 go run ./cmd/relay &
-go run ./cmd/connector run --relay ws://localhost:18080/v1/connect --allow example.com &
-curl -p --proxy http://localhost:18081 \
-  --proxy-header "Proxy-Authorization: Bearer $RUN_TOKEN" https://example.com/
-```
-
-The connector refuses loopback and link-local targets, so test against a real hostname.
-
-### Relay configuration
-
-`RELAY_RUN_TOKEN_KEYS` (`kid:base64-ed25519-pub,...`), `RELAY_STATIC_CONNECTORS`
-(dev only), `RELAY_PUBLIC_PORT` (8080), `RELAY_INTERNAL_PORT` (8081),
-`RELAY_PEERS_SERVICE` (headless service for peer lookup), `POD_NAME`, `POD_IP`,
-`RELAY_TRUST_PROXY_HEADERS`, `RELAY_DRAIN_TIMEOUT_SECONDS` (1200), `LOG_LEVEL`.
+`pkg/connector` tests run the connector against an in-process fake relay.
 
 ## Release
 
