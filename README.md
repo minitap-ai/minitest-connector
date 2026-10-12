@@ -42,8 +42,9 @@ golangci-lint run
 ### Run it locally
 
 ```sh
-go run ./internal/tools/devtoken -domains example.com > /tmp/pn.env   # dev keys + tokens
-set -a; . /tmp/pn.env; set +a
+env_file=$(mktemp)   # private file: it holds dev tokens
+go run ./internal/tools/devtoken -domains example.com > "$env_file"
+set -a; . "$env_file"; set +a
 RELAY_PUBLIC_PORT=18080 RELAY_INTERNAL_PORT=18081 go run ./cmd/relay &
 go run ./cmd/connector run --relay ws://localhost:18080/v1/connect --allow example.com &
 curl -p --proxy http://localhost:18081 \

@@ -64,6 +64,8 @@ func run(log *slog.Logger) error {
 	public := &http.Server{
 		Addr: ":" + strconv.Itoa(envInt("RELAY_PUBLIC_PORT", 8080)), Handler: srv.PublicHandler(),
 		ReadHeaderTimeout: 10 * time.Second,
+		// Only IdleTimeout: Read/WriteTimeout would also cut hijacked sessions.
+		IdleTimeout: 60 * time.Second,
 	}
 	internal := &http.Server{
 		Addr: ":" + strconv.Itoa(internalPort), Handler: srv.InternalHandler(reg),

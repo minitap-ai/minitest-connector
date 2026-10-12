@@ -1,5 +1,4 @@
-// Command devtoken prints a relay run-token key pair and a signed run token,
-// for local development only. Production tokens are minted by testing-service.
+// Command devtoken mints local-only dev keys and tokens; production run tokens come from testing-service.
 //
 //	go run ./internal/tools/devtoken -connector conn-1 -tenant tenant-1 -domains example.com
 package main
