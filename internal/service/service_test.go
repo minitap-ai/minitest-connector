@@ -1,8 +1,10 @@
 package service
 
 import (
+	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLayoutAndRender(t *testing.T) {
@@ -47,5 +49,54 @@ func TestLayoutAndRender(t *testing.T) {
 func TestUnsupportedOS(t *testing.T) {
 	if _, err := layoutFor("windows", false, "C:/", "x"); err == nil {
 		t.Fatal("want error on windows")
+	}
+}
+
+// fakeLaunchd keeps a booted-out job registered for a few polls, and refuses
+// to bootstrap a job that is still registered, like launchd does.
+type fakeLaunchd struct {
+	loaded       bool
+	unloadPolls  int
+	bootstrapped int
+}
+
+func (f *fakeLaunchd) launchctl(args ...string) error {
+	switch args[0] {
+	case "print":
+		if f.loaded && f.unloadPolls > 0 {
+			f.unloadPolls--
+			if f.unloadPolls == 0 {
+				f.loaded = false
+			}
+		}
+		if !f.loaded {
+			return errors.New("could not find service")
+		}
+	case "bootout":
+		f.unloadPolls = 3
+	case "bootstrap":
+		if f.loaded {
+			return errors.New("Bootstrap failed: 5: Input/output error")
+		}
+		f.loaded = true
+		f.bootstrapped++
+	}
+	return nil
+}
+
+func TestReinstallWaitsForLaunchdToUnloadThePreviousJob(t *testing.T) {
+	launchd := &fakeLaunchd{}
+	launchctl, pollInterval, retryDelay = launchd.launchctl, time.Millisecond, time.Millisecond
+	dir := t.TempDir()
+	l := Layout{OS: "darwin", ConfigPath: dir + "/config.yaml", UnitPath: dir + "/unit.plist", Binary: "/bin/true"}
+	cfg := Config{Token: "mtc_test", Allow: []string{"api.internal.example.com"}}
+
+	for range 2 {
+		if err := Install(l, cfg); err != nil {
+			t.Fatalf("install: %v", err)
+		}
+	}
+	if !launchd.loaded || launchd.bootstrapped != 2 {
+		t.Fatalf("loaded=%v bootstrapped=%d, want the reinstalled job running", launchd.loaded, launchd.bootstrapped)
 	}
 }
