@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"text/template"
+	"time"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -172,7 +173,7 @@ func Restart(l Layout) error {
 	if l.OS != "darwin" {
 		return run("systemctl", append(userFlag(l), "restart", unitName)...)
 	}
-	if exec.Command("launchctl", "print", launchdTarget(l)).Run() != nil {
+	if !loaded(l) {
 		return start(l) // installed but not loaded
 	}
 	return run("launchctl", "kickstart", "-k", launchdTarget(l))
@@ -199,7 +200,7 @@ func Status(l Layout) error {
 
 func start(l Layout) error {
 	if l.OS == "darwin" {
-		return run("launchctl", "bootstrap", launchdDomain(l), l.UnitPath)
+		return bootstrap(l)
 	}
 	if err := run("systemctl", append(userFlag(l), "daemon-reload")...); err != nil {
 		return err
@@ -209,9 +210,49 @@ func start(l Layout) error {
 
 func stop(l Layout) error {
 	if l.OS == "darwin" {
-		return exec.Command("launchctl", "bootout", launchdTarget(l)).Run()
+		err := launchctl("bootout", launchdTarget(l))
+		waitUnloaded(l)
+		return err
 	}
 	return exec.Command("systemctl", append(userFlag(l), "disable", "--now", unitName)...).Run()
+}
+
+var (
+	unloadTimeout  = 30 * time.Second
+	pollInterval   = 200 * time.Millisecond
+	bootstrapTries = 5
+	retryDelay     = time.Second
+)
+
+var launchctl = func(args ...string) error {
+	out, err := exec.Command("launchctl", args...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("launchctl %v: %w: %s", args, err, bytes.TrimSpace(out))
+	}
+	return nil
+}
+
+func loaded(l Layout) bool { return launchctl("print", launchdTarget(l)) == nil }
+
+// bootout returns before launchd has removed the job, and bootstrapping it
+// meanwhile fails with "5: Input/output error".
+func waitUnloaded(l Layout) {
+	for deadline := time.Now().Add(unloadTimeout); loaded(l) && time.Now().Before(deadline); {
+		time.Sleep(pollInterval)
+	}
+}
+
+func bootstrap(l Layout) error {
+	var err error
+	for attempt := range bootstrapTries {
+		if attempt > 0 {
+			time.Sleep(retryDelay)
+		}
+		if err = launchctl("bootstrap", launchdDomain(l), l.UnitPath); err == nil {
+			return nil
+		}
+	}
+	return err
 }
 
 func launchdDomain(l Layout) string {
