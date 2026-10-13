@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -98,5 +99,32 @@ func TestReinstallWaitsForLaunchdToUnloadThePreviousJob(t *testing.T) {
 	}
 	if !launchd.loaded || launchd.bootstrapped != 2 {
 		t.Fatalf("loaded=%v bootstrapped=%d, want the reinstalled job running", launchd.loaded, launchd.bootstrapped)
+	}
+}
+
+func TestReinstallKeepsWhatIsNotPassedAgain(t *testing.T) {
+	launchctl, pollInterval, retryDelay = (&fakeLaunchd{}).launchctl, time.Millisecond, time.Millisecond
+	dir := t.TempDir()
+	l := Layout{OS: "darwin", ConfigPath: dir + "/config.yaml", UnitPath: dir + "/unit.plist", Binary: "/bin/true"}
+	first := Config{Token: "mtc_test", Relay: "wss://relay.example.com/v1/connect", Allow: []string{"a.example.com"}, Ports: []int{8443}}
+	if err := Install(l, first); err != nil {
+		t.Fatal(err)
+	}
+
+	prev, err := Installed(l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Install(l, Config{Allow: []string{"b.example.com"}}.Over(prev)); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Installed(l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Config{Token: first.Token, Relay: first.Relay, Allow: []string{"b.example.com"}, Ports: first.Ports}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("config after reinstall = %+v, want %+v", got, want)
 	}
 }

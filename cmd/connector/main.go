@@ -29,7 +29,8 @@ const usage = `minitest-connector lets Minitest devices reach your private netwo
 
 Usage:
   minitest-connector run [flags]                  run in the foreground
-  minitest-connector service install [flags]      install and start as an always-on service
+  minitest-connector service install [flags]      install and start as an always-on service;
+                                                  run it again to change flags, the others are kept
   minitest-connector service restart              restart the service (e.g. after an upgrade)
   minitest-connector service uninstall
   minitest-connector service status
@@ -184,21 +185,29 @@ func serviceCmd(args []string) error {
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
-	tok := firstNonEmpty(*token, os.Getenv("MINITEST_CONNECTOR_TOKEN"))
-	if tok == "" {
-		return errors.New("no token: pass --token or set MINITEST_CONNECTOR_TOKEN")
+	cfg := service.Config{Token: firstNonEmpty(*token, os.Getenv("MINITEST_CONNECTOR_TOKEN")), Relay: *relayURL}
+	if len(allow) > 0 {
+		if cfg.Allow, err = selector.Parse(allow); err != nil {
+			return fmt.Errorf("allow: %w", err)
+		}
 	}
-	sel, err := selector.Parse(allow)
-	if err != nil {
-		return fmt.Errorf("allow: %w", err)
-	}
-	var portList []int
 	if *ports != "" {
-		if portList, err = parsePorts(*ports); err != nil {
+		if cfg.Ports, err = parsePorts(*ports); err != nil {
 			return err
 		}
 	}
-	if err := service.Install(layout, service.Config{Token: tok, Relay: *relayURL, Allow: sel, Ports: portList}); err != nil {
+	prev, err := service.Installed(layout)
+	if err != nil {
+		return err
+	}
+	cfg = cfg.Over(prev)
+	if cfg.Token == "" {
+		return errors.New("no token: pass --token or set MINITEST_CONNECTOR_TOKEN")
+	}
+	if len(cfg.Allow) == 0 {
+		return errors.New("no allowed domain: pass --allow")
+	}
+	if err := service.Install(layout, cfg); err != nil {
 		return err
 	}
 	scope := "user service (runs while you are logged in; use sudo for a boot-time service)"

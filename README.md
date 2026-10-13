@@ -32,7 +32,7 @@ Minitest test device ──> Minitest ══ outbound WSS, port 443 ══ conne
 
 Create a connector in the Minitest web app (**Workspace settings → Private network →
 Add connector**) to get your token, then install it on a machine that can reach your
-staging.
+internal servers.
 
 ### macOS (Homebrew)
 
@@ -59,6 +59,13 @@ With `sudo`, `service install` registers a service that starts at boot (launchd 
 on macOS, systemd unit running as an unprivileged dynamic user on Linux). Without
 `sudo`, it installs a per-user service. The token is stored in a `0600` config file,
 never in the service definition. Remove it with `minitest-connector service uninstall`.
+
+To change the allowed domains, the ports or the token later, run `service install` again
+with only the flags that change; the others are kept from the installed config:
+
+```sh
+sudo minitest-connector service install --allow '*.internal.example.com,api.example.com'
+```
 
 To run it in the foreground instead (e.g. to try it out):
 

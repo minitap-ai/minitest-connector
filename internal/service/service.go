@@ -31,6 +31,41 @@ type Config struct {
 	Ports []int    `yaml:"ports,omitempty"`
 }
 
+// Installed returns the config of the service already installed, or an empty
+// Config when there is none.
+func Installed(l Layout) (Config, error) {
+	var cfg Config
+	raw, err := os.ReadFile(l.ConfigPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return cfg, nil
+	}
+	if err != nil {
+		return cfg, err
+	}
+	if err := yaml.Unmarshal(raw, &cfg); err != nil {
+		return cfg, fmt.Errorf("config %s: %w", l.ConfigPath, err)
+	}
+	return cfg, nil
+}
+
+// Over fills what c leaves unset from prev, so a reinstall only needs the
+// flags that change: the token is only shown once in the web app.
+func (c Config) Over(prev Config) Config {
+	if c.Token == "" {
+		c.Token = prev.Token
+	}
+	if c.Relay == "" {
+		c.Relay = prev.Relay
+	}
+	if len(c.Allow) == 0 {
+		c.Allow = prev.Allow
+	}
+	if len(c.Ports) == 0 {
+		c.Ports = prev.Ports
+	}
+	return c
+}
+
 // Layout is where files go for the current platform and privilege.
 type Layout struct {
 	OS         string
